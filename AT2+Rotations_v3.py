@@ -687,7 +687,7 @@ target_entry.grid(row=0, column=1, columnspan=2, padx=5, pady=2, sticky='we')
 
 tk.Label(scrollable_frame, text="Left populations:").grid(row=1, column=0, sticky='w', padx=5, pady=2)
 left_var = tk.StringVar()
-left_entry = tk.Entry(scrollable_frame, width=70)
+left_entry = tk.Entry(scrollable_frame, width=70, textvariable=left_var)
 left_entry.grid(row=1, column=1, columnspan=2, padx=5, pady=2, sticky='we')
 
 def open_left_editor():
