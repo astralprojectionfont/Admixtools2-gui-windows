@@ -322,9 +322,6 @@ def edit_and_run_r_code():
     dataset_prefix = prefix_entry.get().strip()
     r_folder = r_folder_entry.get().strip()
 
-    if not dataset_prefix:
-        messagebox.showerror("Missing info", "Please specify the dataset prefix.")
-        return
     if not r_folder:
         messagebox.showerror("Missing R folder", "Please specify the R installation folder.")
         return
@@ -365,8 +362,18 @@ cat("Blocks:", results$summary$nblocks, "SNPs:", results$summary$nsnps, "\\n")
 
     # --- Create the popup editor window ---
     editor_win = tk.Toplevel(root)
+    editor_win.attributes('-topmost', True)
     editor_win.title("Edit R Code Manually")
 
+    def enforce_always_on_top():
+        try:
+            editor_win.attributes("-topmost", True)
+        except tk.TclError:
+            return  # Window likely closed
+        editor_win.after(1000, enforce_always_on_top)
+
+    enforce_always_on_top()  # Start the loop
+    
     # Text editor
     text_editor = tk.Text(editor_win, wrap=tk.NONE, width=100, height=30, undo=True)
     text_editor.insert('1.0', custom_r_code)
@@ -415,12 +422,6 @@ cat("Blocks:", results$summary$nblocks, "SNPs:", results$summary$nsnps, "\\n")
         finally:
             os.remove(r_script_path)
 
-    def save_edited_code():
-        global custom_r_code
-        edited_code = text_editor.get("1.0", tk.END)
-        custom_r_code = edited_code
-        status_label.config(text="Code changes saved. Close the window or run the code.")
-
     def restore_original_code():
         nonlocal text_editor
         global custom_r_code
@@ -430,20 +431,16 @@ cat("Blocks:", results$summary$nblocks, "SNPs:", results$summary$nsnps, "\\n")
 
     def on_editor_close():
         current_code = text_editor.get("1.0", tk.END)
-        if current_code != custom_r_code:
-            if messagebox.askyesno("Unsaved Changes", "You have unsaved changes. Close without saving?"):
-                editor_win.destroy()
-        else:
-            editor_win.destroy()
+    # Always save the edited code before closing
+        global custom_r_code
+        custom_r_code = current_code
+        editor_win.destroy()
 
     editor_win.protocol("WM_DELETE_WINDOW", on_editor_close)
 
     # --- Buttons Frame ---
     button_frame = tk.Frame(editor_win)
     button_frame.pack(fill=tk.X, pady=5)
-
-    save_btn = tk.Button(button_frame, text="Save Code", command=save_edited_code, bg="lightblue")
-    save_btn.pack(side=tk.LEFT, padx=5)
 
     restore_btn = tk.Button(button_frame, text="Restore Original Code", command=restore_original_code, bg="orange")
     restore_btn.pack(side=tk.LEFT, padx=5)
@@ -892,15 +889,6 @@ text_frame.pack(fill=tk.BOTH, expand=True)
 ind_text = tk.Text(text_frame, wrap=tk.NONE, width=80, height=15, undo=True, autoseparators=True, maxundo=-1)
 ind_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-def disable_ctrl_shortcuts(event):
-    if event.state == 4 and event.keysym in ('z', 'y', 'Z', 'Y'):
-        return "break"
-
-ind_text.bind('<Control-z>', disable_ctrl_shortcuts)
-ind_text.bind('<Control-y>', disable_ctrl_shortcuts)
-ind_text.bind('<Control-Z>', disable_ctrl_shortcuts)
-ind_text.bind('<Control-Y>', disable_ctrl_shortcuts)
-
 y_scroll = tk.Scrollbar(text_frame, command=ind_text.yview)
 y_scroll.pack(side=tk.RIGHT, fill=tk.Y)
 ind_text.config(yscrollcommand=y_scroll.set)
@@ -1293,7 +1281,7 @@ save_output_button = tk.Button(button_frame, text="💾 Save", command=save_outp
 save_output_button.pack(side=tk.LEFT)
 
 # --- OUTPUT CONSOLE ---
-output_text = scrolledtext.ScrolledText(scrollable_frame, width=120, height=30, undo=True)
+output_text = scrolledtext.ScrolledText(scrollable_frame, width=150, height=30, undo=True)
 output_text.grid(row=10, column=0, columnspan=3, padx=10, pady=5, sticky='nsew')
 
 scrollable_frame.grid_rowconfigure(7, weight=1)
@@ -1308,11 +1296,11 @@ scrollable_frame.grid_columnconfigure(2, weight=0)
 
 # --- Repeating Vertical Text Label on the Right ---
 word = 'pepsimanfire'
-repeat_count = 5  # You can increase this to make it go further down
+repeat_count = 6  # You can increase this to make it go further down
 vertical_text = '\n'.join(list(word) * repeat_count)
 
 vertical_label = tk.Label(scrollable_frame, text=vertical_text, font=("Helvetica", 12, "bold"), fg="gray")
-vertical_label.grid(row=0, column=3, rowspan=999, sticky='ns', padx=(100, 5), pady=10)
+vertical_label.grid(row=0, column=3, rowspan=999, sticky='ns', padx=(60, 5), pady=10)
 
 # Call this function after creating the output_text widget
 setup_output_search()
