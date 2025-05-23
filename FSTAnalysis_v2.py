@@ -139,12 +139,6 @@ def edit_and_run_r_code():
     r_folder = r_folder_entry.get().strip()
     adjust_ph = pseudohaploid_var.get()
 
-    if not dataset_prefix:
-        messagebox.showerror("Missing info", "Please specify the dataset prefix.")
-        return
-    if not f2_dir:
-        messagebox.showerror("Missing info", "Please specify the F2 directory.")
-        return
     if not r_folder:
         messagebox.showerror("Missing R folder", "Please specify the R installation folder.")
         return
@@ -183,7 +177,17 @@ print(fst_result, n = Inf)
         custom_r_code = default_r_code
 
     editor_win = tk.Toplevel(root)
+    editor_win.attributes('-topmost', True)
     editor_win.title("Edit FST R Code")
+
+    def enforce_always_on_top():
+        try:
+            editor_win.attributes("-topmost", True)
+        except tk.TclError:
+            return  # Window likely closed
+        editor_win.after(1000, enforce_always_on_top)
+
+    enforce_always_on_top()  # Start the loop
 
     text_editor = tk.Text(editor_win, wrap=tk.NONE, width=100, height=30, undo=True)
     text_editor.insert('1.0', custom_r_code)
@@ -242,18 +246,16 @@ print(fst_result, n = Inf)
 
     def on_editor_close():
         current_code = text_editor.get("1.0", tk.END)
-        if current_code != custom_r_code:
-            if messagebox.askyesno("Unsaved Changes", "You have unsaved changes. Close without saving?"):
-                editor_win.destroy()
-        else:
-            editor_win.destroy()
+    # Always save the edited code before closing
+        global custom_r_code
+        custom_r_code = current_code
+        editor_win.destroy()
 
     editor_win.protocol("WM_DELETE_WINDOW", on_editor_close)
 
     button_frame = tk.Frame(editor_win)
     button_frame.pack(fill=tk.X, pady=5)
 
-    tk.Button(button_frame, text="Save Code", command=save_edited_code, bg="lightblue").pack(side=tk.LEFT, padx=5)
     tk.Button(button_frame, text="Restore Original Code", command=restore_original_code, bg="orange").pack(side=tk.LEFT, padx=5)
     tk.Button(editor_win, text="Run This Code", command=run_edited_r_code, bg="lightgreen").pack(pady=5)
 
