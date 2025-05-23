@@ -90,7 +90,7 @@ mypops <- c({pop1}, {pop2})  # Combined directly
 extract_f2(prefix, my_f2_dir, pops = c(mypops), overwrite = TRUE, maxmiss = 1)
 f2_blocks = f2_from_precomp(my_f2_dir, pops = mypops, afprod = TRUE)
 
-fst_result <- fst(data = prefix, pop1 = pop1, pop2 = pop2, boot = FALSE, adjust_pseudohaploid = FALSE)
+fst_result <- fst(data = prefix, pop1 = pop1, pop2 = pop2, boot = FALSE, adjust_pseudohaploid = {adj_flag})
 print(fst_result, n = Inf)
 """
 
