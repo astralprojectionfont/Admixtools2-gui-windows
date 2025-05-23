@@ -6,7 +6,6 @@ import os
 import re
 from datetime import datetime
 
-
 population_history = []
 history_index = -1
 
@@ -21,6 +20,7 @@ def format_pops(input_str):
     clean_input = input_str.replace('"', '').replace("'", '')
     pops = [p.strip() for p in re.split(r'[,\s]+', clean_input) if p.strip()]
     return ','.join(f'"{p}"' for p in pops)
+
 
 def get_r_library_paths(rscript_path='Rscript'):
     try:
@@ -59,6 +59,12 @@ def run_fst_analysis():
         messagebox.showerror("Rscript not found", f"Rscript.exe not found at expected location:\n{rscript_path}")
         return
 
+    # Fix: Remove these R-style lines from Python code
+    # pop1 <- c({pop1})
+    # pop2 <- c({pop2})
+    # mypops = c(pop1, pop2)  # This is correct R syntax
+
+    # Instead, format the population strings properly
     pop1 = format_pops(pop1_raw)
     pop2 = format_pops(pop2_raw)
     
@@ -79,14 +85,15 @@ my_f2_dir = "{f2_dir}"
 # Explicit population definitions
 pop1 <- c({pop1})
 pop2 <- c({pop2})
-mypops <- c(pop1, pop2)  # Combined directly
+mypops <- c({pop1}, {pop2})  # Combined directly
 
 extract_f2(prefix, my_f2_dir, pops = c(mypops), overwrite = TRUE, maxmiss = 1)
 f2_blocks = f2_from_precomp(my_f2_dir, pops = mypops, afprod = TRUE)
 
-fst_result <- fst(data = prefix, pop1 = pop1, pop2 = pop2, boot = FALSE, adjust_pseudohaploid = {adj_flag})
+fst_result <- fst(data = prefix, pop1 = pop1, pop2 = pop2, boot = FALSE, adjust_pseudohaploid = FALSE)
 print(fst_result, n = Inf)
 """
+
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".R") as r_script:
         r_script.write(r_code.encode('utf-8'))
@@ -96,77 +103,33 @@ print(fst_result, n = Inf)
         process = subprocess.Popen(
             [rscript_path, r_script_path],
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
             encoding='utf-8'
         )
-        
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        output_text.insert(tk.END, f"\n--- FST Analysis Started at {timestamp} ---\n")
-        output_text.insert(tk.END, f"Population 1: {pop1_raw}\nPopulation 2: {pop2_raw}\n")
-        output_text.insert(tk.END, f"Dataset: {dataset_prefix}\nF2 Directory: {f2_dir}\n")
-        output_text.insert(tk.END, f"Pseudohaploid Adjustment: {adjust_ph}\n\n")
+        output_text.insert(tk.END, f"\n--- Run started at {datetime.now()} ---\n")
+        output_text.insert(tk.END, f"Pop1: {pop1_raw}\nPop2: {pop2_raw}\n\n")
         output_text.see(tk.END)
-        output_text.update()
 
-        # Collect all output for error handling
-        full_output = []
+        # Buffer to store the last SNP read line
         last_snp_line = ""
-        error_occurred = False
 
-        # Read both stdout and stderr simultaneously
-        while True:
-            stdout_line = process.stdout.readline()
-            stderr_line = process.stderr.readline()
-            
-            if not stdout_line and not stderr_line and process.poll() is not None:
-                break
-                
-            if stdout_line:
-                line = stdout_line.strip()
-                full_output.append(line)
-                
-                if "SNPs read" in line:
-                    last_snp_line = line
-                    output_text.delete("end-2l", "end-1l")
-                    output_text.insert(tk.END, last_snp_line + "\n")
-                else:
-                    output_text.insert(tk.END, line + "\n")
-                
-                output_text.see(tk.END)
-                output_text.update()
-                
-            if stderr_line:
-                error_line = stderr_line.strip()
-                if error_line:  # Only show non-empty error lines
-                    full_output.append(f"ERROR: {error_line}")
-                    output_text.insert(tk.END, f"❌ {error_line}\n", 'error')
-                    error_occurred = True
-                    output_text.see(tk.END)
-                    output_text.update()
+        for line in process.stdout:
+            if "SNPs read" in line:
+                # Strip and overwrite the previous SNP line
+                last_snp_line = line.strip()
+                output_text.delete("end-2l", "end-1l")
+                output_text.insert(tk.END, last_snp_line + "\n")
+            else:
+                output_text.insert(tk.END, line)
+            output_text.see(tk.END)
 
         process.wait()
-        
-        # Check for errors after completion
-        if process.returncode != 0 or error_occurred:
-            error_msg = "\n".join([line for line in full_output if "ERROR:" in line or "error" in line.lower()])
-            output_text.insert(tk.END, f"\n❌ FST analysis failed (exit code: {process.returncode})\n")
-            if error_msg:
-                output_text.insert(tk.END, f"Error details:\n{error_msg}\n")
-            status_label.config(text="FST analysis failed!")
-        else:
-            output_text.insert(tk.END, "\n✔ FST analysis completed successfully\n")
-            status_label.config(text="FST analysis completed.")
-
+        status_label.config(text="FST analysis completed.")
     except Exception as e:
-        error_msg = f"Unexpected error: {str(e)}"
-        output_text.insert(tk.END, f"\n❌ {error_msg}\n")
-        messagebox.showerror("Runtime Error", error_msg)
-        status_label.config(text="FST analysis failed!")
+        messagebox.showerror("Error", str(e))
     finally:
-        if os.path.exists(r_script_path):
-            os.remove(r_script_path)
-
+        os.remove(r_script_path)
 
 def edit_and_run_r_code():
     global custom_r_code
@@ -212,7 +175,7 @@ mypops = c(pop1, pop2)
 extract_f2(prefix, my_f2_dir, pops = c(mypops), overwrite = TRUE, maxmiss = 1)
 f2_blocks = f2_from_precomp(my_f2_dir, pops = mypops, afprod = TRUE)
 
-fst_result <- fst(data = prefix, pop1 = pop1, pop2 = pop2, boot = FALSE, adjust_pseudohaploid = {adj_flag})
+fst_result <- fst(data = prefix, pop1 = pop1, pop2 = pop2, boot = FALSE, adjust_pseudohaploid = FALSE)
 print(fst_result, n = Inf)
 """.strip()
 
@@ -221,14 +184,10 @@ print(fst_result, n = Inf)
 
     editor_win = tk.Toplevel(root)
     editor_win.title("Edit FST R Code")
-    editor_win.geometry("900x600")
 
-    text_editor = tk.Text(editor_win, wrap=tk.NONE, width=100, height=30, undo=True, font=("Consolas", 10))
+    text_editor = tk.Text(editor_win, wrap=tk.NONE, width=100, height=30, undo=True)
     text_editor.insert('1.0', custom_r_code)
     text_editor.pack(fill=tk.BOTH, expand=True)
-
-    # Configure error tag
-    text_editor.tag_config('error', foreground='red')
 
     def run_edited_r_code():
         global custom_r_code
@@ -243,77 +202,37 @@ print(fst_result, n = Inf)
             process = subprocess.Popen(
                 [rscript_path, r_script_path],
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 text=True,
                 encoding='utf-8'
             )
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            output_text.insert(tk.END, f"\n---\n[Custom R Code Execution - {timestamp}]\n")
-            output_text.insert(tk.END, "Running custom R code...\n")
-            output_text.see(tk.END)
-            output_text.update()
+            output_text.insert(tk.END, f"\n---\n[Custom FST R Code Output - {timestamp}]\n")
 
-            full_output = []
-            error_occurred = False
+            # Buffer to store the last SNP read line
             last_snp_line = ""
 
-            # Read both stdout and stderr simultaneously
-            while True:
-                stdout_line = process.stdout.readline()
-                stderr_line = process.stderr.readline()
-                
-                if not stdout_line and not stderr_line and process.poll() is not None:
-                    break
-                    
-                if stdout_line:
-                    line = stdout_line.strip()
-                    full_output.append(line)
-                    
-                    if "SNPs read" in line:
-                        last_snp_line = line
-                        output_text.delete("end-2l", "end-1l")
-                        output_text.insert(tk.END, last_snp_line + "\n")
-                    else:
-                        output_text.insert(tk.END, line + "\n")
-                    
-                    output_text.see(tk.END)
-                    output_text.update()
-                    
-                if stderr_line:
-                    error_line = stderr_line.strip()
-                    if error_line:  # Only show non-empty error lines
-                        full_output.append(f"ERROR: {error_line}")
-                        output_text.insert(tk.END, f"❌ {error_line}\n", 'error')
-                        error_occurred = True
-                        output_text.see(tk.END)
-                        output_text.update()
+            for line in process.stdout:
+                if "SNPs read" in line:
+                    # Strip and overwrite the previous SNP line
+                    last_snp_line = line.strip()
+                    output_text.delete("end-2l", "end-1l")
+                    output_text.insert(tk.END, last_snp_line + "\n")
+                else:
+                    output_text.insert(tk.END, line)
+                output_text.see(tk.END)
 
             process.wait()
-            
-            # Check results after completion
-            if process.returncode != 0 or error_occurred:
-                error_msg = "\n".join([line for line in full_output if "ERROR:" in line or "error" in line.lower()])
-                output_text.insert(tk.END, f"\n❌ Custom R code failed (exit code: {process.returncode})\n")
-                if error_msg:
-                    output_text.insert(tk.END, f"Error details:\n{error_msg}\n")
-                status_label.config(text="Custom R code failed!")
-            else:
-                output_text.insert(tk.END, "\n✔ Custom R code executed successfully\n")
-                status_label.config(text="Custom R code executed.")
-
+            status_label.config(text="Custom R code executed.")
         except Exception as e:
-            error_msg = f"Failed to execute R code: {str(e)}"
-            output_text.insert(tk.END, f"\n❌ {error_msg}\n", 'error')
-            messagebox.showerror("Execution Error", error_msg)
-            status_label.config(text="Custom R code failed!")
+            messagebox.showerror("Execution Error", str(e))
         finally:
-            if os.path.exists(r_script_path):
-                os.remove(r_script_path)
+            os.remove(r_script_path)
 
     def save_edited_code():
         global custom_r_code
         custom_r_code = text_editor.get("1.0", tk.END)
-        status_label.config(text="Custom R code saved.")
+        status_label.config(text="Code saved.")
 
     def restore_original_code():
         nonlocal text_editor
@@ -337,6 +256,7 @@ print(fst_result, n = Inf)
     tk.Button(button_frame, text="Save Code", command=save_edited_code, bg="lightblue").pack(side=tk.LEFT, padx=5)
     tk.Button(button_frame, text="Restore Original Code", command=restore_original_code, bg="orange").pack(side=tk.LEFT, padx=5)
     tk.Button(editor_win, text="Run This Code", command=run_edited_r_code, bg="lightgreen").pack(pady=5)
+
 
 # --- MAIN WINDOW SETUP WITH SCROLLBAR ---
 root = tk.Tk()
@@ -748,7 +668,7 @@ search_entry.bind("<Return>", jump_to_next_match)
 search_entry.bind("<Down>", jump_to_next_match)
 search_entry.bind("<Up>", jump_to_prev_match)
 
-output_text = scrolledtext.ScrolledText(scrollable_frame, width=120, height=30)
+output_text = scrolledtext.ScrolledText(scrollable_frame, width=150, height=30)
 output_text.grid(row=8, column=0, columnspan=3, padx=10, pady=5, sticky='nsew')
 
 # --- Status/Button Row ---
@@ -871,6 +791,6 @@ repeat_count = 5  # You can increase this to make it go further down
 vertical_text = '\n'.join(list(word) * repeat_count)
 
 vertical_label = tk.Label(scrollable_frame, text=vertical_text, font=("Helvetica", 12, "bold"), fg="gray")
-vertical_label.grid(row=0, column=5, rowspan=999, sticky='ns', padx=(100, 5), pady=10)
+vertical_label.grid(row=0, column=5, rowspan=999, sticky='ns', padx=(0, 5), pady=10)
 
 root.mainloop()
