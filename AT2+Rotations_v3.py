@@ -576,7 +576,7 @@ tryCatch({{
 """
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".R", mode='w') as r_script:
-            r_script.write(r_code)
+            r_script.write(r_code.encode('utf-8')
             r_script_path = r_script.name
 
         try:
