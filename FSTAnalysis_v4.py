@@ -264,11 +264,6 @@ print(fst_result, n = Inf)
 root = tk.Tk()
 root.title("FST Runner (admixtools)")
 
-root.bind('<Control-z>', lambda e: undo_population_addition())
-root.bind('<Control-y>', lambda e: redo_population_addition())
-root.bind('<Control-Z>', lambda e: undo_population_addition())
-root.bind('<Control-Y>', lambda e: redo_population_addition())
-
 # Create main frame with scrollbar
 main_frame = tk.Frame(root)
 main_frame.pack(fill=tk.BOTH, expand=1)
