@@ -1282,7 +1282,7 @@ save_output_button = tk.Button(button_frame, text="💾 Save", command=save_outp
 save_output_button.pack(side=tk.LEFT)
 
 # --- OUTPUT CONSOLE ---
-output_text = scrolledtext.ScrolledText(scrollable_frame, width=150, height=30, undo=True)
+output_text = scrolledtext.ScrolledText(scrollable_frame, width=150, height=30)
 output_text.grid(row=10, column=0, columnspan=3, padx=10, pady=5, sticky='nsew')
 
 scrollable_frame.grid_rowconfigure(7, weight=1)
@@ -1305,13 +1305,5 @@ vertical_label.grid(row=0, column=3, rowspan=999, sticky='ns', padx=(60, 5), pad
 
 # Call this function after creating the output_text widget
 setup_output_search()
-
-# --- Output Console Bindings ---
-output_text.bind('<Control-z>', lambda e: output_text.edit_undo())
-
-root.bind('<Control-z>', lambda e: undo_population_addition())
-root.bind('<Control-y>', lambda e: redo_population_addition())
-root.bind('<Control-Z>', lambda e: undo_population_addition())
-root.bind('<Control-Y>', lambda e: redo_population_addition())
 
 root.mainloop()
